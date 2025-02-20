@@ -1,7 +1,12 @@
 name: Build and Release ECM/UNECM
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - release
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -24,59 +29,71 @@ jobs:
       - name: Compile on Linux
         if: runner.os == 'Linux'
         run: |
-          gcc -o ecm ecm.c
-          gcc -o unecm unecm.c
+          gcc -o ecm-linux ecm.c
+          gcc -o unecm-linux unecm.c
         shell: bash
 
       - name: Compile on macOS (Universal Binary)
         if: runner.os == 'macOS'
         run: |
-          gcc -arch x86_64 -arch arm64 -o ecm ecm.c
-          gcc -arch x86_64 -arch arm64 -o unecm unecm.c
+          gcc -arch x86_64 -arch arm64 -o ecm-macos ecm.c
+          gcc -arch x86_64 -arch arm64 -o unecm-macos unecm.c
         shell: bash
 
       - name: Compile on Windows
         if: runner.os == 'Windows'
         run: |
-          gcc -o ecm.exe ecm.c
-          gcc -o unecm.exe unecm.c
+          gcc -o ecm-windows.exe ecm.c
+          gcc -o unecm-windows.exe unecm.c
         shell: bash
 
       - name: Prepare Artifacts
         run: |
-          mkdir -p release/${{ runner.os }}
-          mv ecm* unecm* release/${{ runner.os }}/
+          mkdir -p bin
+          mv ecm-* unecm-* bin/ 2>/dev/null || true
         shell: bash
 
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: ecm-unecm-${{ runner.os }}
-          path: release/${{ runner.os }}/*
-
   release:
-    name: Create GitHub Release
+    name: Create Release
     runs-on: ubuntu-latest
     needs: build
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Download all Artifacts
-        uses: actions/download-artifact@v4
-
-      - name: Move Artifacts to Release Folder
+      - name: Get Latest Tag
+        id: get_latest_tag
         run: |
-          mkdir -p release
-          mv ecm-unecm-*/ecm* ecm-unecm-*/unecm* release/
-        shell: bash
+          git fetch --tags
+          TAG=$(git describe --tags `git rev-list --tags --max-count=1` || echo "v0.0.0")
+          echo "Latest tag: $TAG"
+          echo "LATEST_TAG=$TAG" >> $GITHUB_ENV
+
+      - name: Bump Version
+        id: bump_version
+        run: |
+          latest_version=${{ env.LATEST_TAG }}
+          if [[ "$latest_version" == "v0.0.0" ]]; then
+            new_version="v1.0.0"
+          else
+            new_version=$(echo $latest_version | awk -F. '{$NF = $NF + 1;} 1' | sed 's/ /./g')
+          fi
+          echo "New version: $new_version"
+          echo "NEW_VERSION=$new_version" >> $GITHUB_ENV
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: "release/*"
-          tag_name: ${{ github.ref_name }}
-          name: Release ${{ github.ref_name }}
-          body: "Automatically generated release binaries for ECM/UNECM."
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create ${{ env.NEW_VERSION }} --title "Release ${{ env.NEW_VERSION }}" --notes "Automatically generated release."
+
+      - name: Install GitHub CLI
+        run: sudo apt-get install gh
+
+      - name: Upload Release Assets
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for file in bin/*; do
+            gh release upload ${{ env.NEW_VERSION }} "$file" --clobber
+          done
