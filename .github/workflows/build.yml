@@ -21,11 +21,18 @@ jobs:
           gcc --version
         shell: bash
 
-      - name: Compile on Linux & macOS
-        if: runner.os != 'Windows'
+      - name: Compile on Linux
+        if: runner.os == 'Linux'
         run: |
           gcc -o ecm ecm.c
           gcc -o unecm unecm.c
+        shell: bash
+
+      - name: Compile on macOS (Universal Binary)
+        if: runner.os == 'macOS'
+        run: |
+          gcc -arch x86_64 -arch arm64 -o ecm ecm.c
+          gcc -arch x86_64 -arch arm64 -o unecm unecm.c
         shell: bash
 
       - name: Compile on Windows
