@@ -1,0 +1,68 @@
+name: Build and Release ECM/UNECM
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up build environment
+        run: |
+          echo "Setting up build environment..."
+        shell: bash
+
+      - name: Compile on Linux & macOS
+        if: runner.os != 'Windows'
+        run: |
+          gcc -o ecm ecm.c
+          gcc -o unecm unecm.c
+        shell: bash
+
+      - name: Compile on Windows
+        if: runner.os == 'Windows'
+        run: |
+          cl /EHsc /O2 /Fe:ecm.exe ecm.c
+          cl /EHsc /O2 /Fe:unecm.exe unecm.c
+        shell: cmd
+
+      - name: Prepare Artifacts
+        run: |
+          mkdir release
+          mv ecm* unecm* release/
+        shell: bash
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ecm-unecm-${{ runner.os }}
+          path: release/*
+
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Download all Artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: "*/ecm* *unecm*"
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          body: "Release-Binaries for ECM/UNECM."
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
