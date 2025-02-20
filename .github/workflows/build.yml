@@ -27,28 +27,25 @@ jobs:
       - name: Compile on Linux
         if: runner.os == 'Linux'
         run: |
-          gcc -o ecm-linux ecm.c
-          gcc -o unecm-linux unecm.c
+          mkdir -p bin
+          gcc -o bin/ecm-linux ecm.c
+          gcc -o bin/unecm-linux unecm.c
         shell: bash
 
       - name: Compile on macOS (Universal Binary)
         if: runner.os == 'macOS'
         run: |
-          gcc -arch x86_64 -arch arm64 -o ecm-macos ecm.c
-          gcc -arch x86_64 -arch arm64 -o unecm-macos unecm.c
+          mkdir -p bin
+          gcc -arch x86_64 -arch arm64 -o bin/ecm-macos ecm.c
+          gcc -arch x86_64 -arch arm64 -o bin/unecm-macos unecm.c
         shell: bash
 
       - name: Compile on Windows
         if: runner.os == 'Windows'
         run: |
-          gcc -o ecm-windows.exe ecm.c
-          gcc -o unecm-windows.exe unecm.c
-        shell: bash
-
-      - name: Prepare Artifacts
-        run: |
           mkdir -p bin
-          mv ecm-* unecm-* bin/ 2>/dev/null || true
+          gcc -o bin/ecm-windows.exe ecm.c
+          gcc -o bin/unecm-windows.exe unecm.c
         shell: bash
 
       - name: Upload Artifacts
@@ -78,12 +75,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          mkdir -p bin
-          mv ecm-* unecm-* bin/ 2>/dev/null || true
-          if [ -n "$(ls -A bin 2>/dev/null)" ]; then
-            for file in bin/*; do
-              gh release upload v1.0.0 "$file" --clobber
-            done
-          else
-            echo "No files found to upload"
-          fi
+          for file in bin/*; do
+            gh release upload v1.0.0 "$file" --clobber
+          done
