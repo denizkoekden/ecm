@@ -51,47 +51,39 @@ jobs:
           mv ecm-* unecm-* bin/ 2>/dev/null || true
         shell: bash
 
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ecm-unecm-${{ matrix.os }}
+          path: bin/*
+
   release:
-    name: Create Release
+    name: Create GitHub Release
     runs-on: ubuntu-latest
     needs: build
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Get Latest Tag
-        id: get_latest_tag
-        run: |
-          git fetch --tags
-          TAG=$(git describe --tags `git rev-list --tags --max-count=1` || echo "v0.0.0")
-          echo "Latest tag: $TAG"
-          echo "LATEST_TAG=$TAG" >> $GITHUB_ENV
-
-      - name: Bump Version
-        id: bump_version
-        run: |
-          latest_version=${{ env.LATEST_TAG }}
-          if [[ "$latest_version" == "v0.0.0" ]]; then
-            new_version="v1.0.0"
-          else
-            new_version=$(echo $latest_version | awk -F. '{$NF = $NF + 1;} 1' | sed 's/ /./g')
-          fi
-          echo "New version: $new_version"
-          echo "NEW_VERSION=$new_version" >> $GITHUB_ENV
+      - name: Download all Artifacts
+        uses: actions/download-artifact@v4
 
       - name: Create Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create ${{ env.NEW_VERSION }} --title "Release ${{ env.NEW_VERSION }}" --notes "Automatically generated release."
-
-      - name: Install GitHub CLI
-        run: sudo apt-get install gh
+          gh release create v1.0.0 --title "Release v1.0.0" --notes "Automatically generated release."
 
       - name: Upload Release Assets
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          for file in bin/*; do
-            gh release upload ${{ env.NEW_VERSION }} "$file" --clobber
-          done
+          mkdir -p bin
+          mv ecm-* unecm-* bin/ 2>/dev/null || true
+          if [ -n "$(ls -A bin 2>/dev/null)" ]; then
+            for file in bin/*; do
+              gh release upload v1.0.0 "$file" --clobber
+            done
+          else
+            echo "No files found to upload"
+          fi
