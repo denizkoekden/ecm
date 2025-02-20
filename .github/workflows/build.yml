@@ -15,9 +15,11 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set up build environment
+      - name: Install MinGW on Windows
+        if: runner.os == 'Windows'
         run: |
-          echo "Setting up build environment..."
+          choco install mingw -y
+          echo "C:\ProgramData\chocolatey\bin" >> $GITHUB_PATH
         shell: bash
 
       - name: Compile on Linux & macOS
@@ -30,9 +32,9 @@ jobs:
       - name: Compile on Windows
         if: runner.os == 'Windows'
         run: |
-          cl /EHsc /O2 /Fe:ecm.exe ecm.c
-          cl /EHsc /O2 /Fe:unecm.exe unecm.c
-        shell: cmd
+          gcc -o ecm.exe ecm.c
+          gcc -o unecm.exe unecm.c
+        shell: bash
 
       - name: Prepare Artifacts
         run: |
